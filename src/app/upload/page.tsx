@@ -1,96 +1,144 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
 "use client";
-
-import { useState, useRef } from "react";
+import React from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload } from "lucide-react";
 import Papa from "papaparse";
-import { DynamicTable } from "@/components/DynamicTable";
+import {
+  Box,
+  Typography,
+  Paper,
+  Button,
+  Container,
+  useTheme,
+  styled,
+} from "@mui/material";
+import { Upload as UploadIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+const UploadPaper = styled(Paper)(({ theme }) => ({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  border: `2px dashed ${theme.palette.primary.main}`,
+  borderRadius: theme.shape.borderRadius,
+  padding: theme.spacing(8),
+  textAlign: "center",
+  cursor: "pointer",
+  transition: "all 0.3s ease-in-out",
+  "&:hover": {
+    borderColor: theme.palette.secondary.main,
+    backgroundColor: theme.palette.background.default,
+  },
+}));
+
+const GradientTypography = styled(Typography)({
+  background: "linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)",
+  WebkitBackgroundClip: "text",
+  WebkitTextFillColor: "transparent",
+});
 
 export default function FileUpload() {
-  const [file, setFile] = useState<File | null>(null);
-  const [data, setData] = useState<Record<string, string | number>[]>([]);
-  const [fileUploaded, setFileUploaded] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const theme = useTheme();
 
   const GetFileData = (file: File) => {
     Papa.parse<Record<string, string | number>>(file, {
       header: true,
-      complete: async (results) => {
-        console.log(results);
-        setData(results.data);
+      dynamicTyping: true, // This enables automatic type conversion
+      complete: (results) => {
+        // Additional step to ensure numeric values are properly parsed
+        const parsedData = results.data.map((row) => {
+          const newRow: Record<string, string | number> = {};
+          for (const [key, value] of Object.entries(row)) {
+            if (typeof value === "string") {
+              const num = Number(value);
+              if (!Number.isNaN(num)) {
+                newRow[key] = num;
+              } else {
+                newRow[key] = value;
+              }
+            } else {
+              newRow[key] = value;
+            }
+          }
+          return newRow;
+        });
+
+        console.log(parsedData);
+        localStorage.setItem("data", JSON.stringify(parsedData));
+        router.push("/dataTable");
       },
     });
   };
 
   const onDrop = (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-      setFileUploaded(true);
       GetFileData(acceptedFiles[0]);
     }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    noClick: true,
+    accept: {
+      "text/csv": [".csv"],
+      "application/vnd.ms-excel": [".csv"],
+    },
+    multiple: false,
   });
 
-  const handleClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      setFile(files[0]);
-      setFileUploaded(true);
-      GetFileData(files[0]);
-    }
-  };
-
   return (
-    <div className="w-full max-w-2xl mx-auto p-4">
-      {!fileUploaded && (
-        <>
-          <label htmlFor="picture" className="text-lg mb-2 block">
-            Upload Picture
-          </label>
-          <div
-            {...getRootProps()}
-            onClick={handleClick}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-          ${
-            isDragActive
-              ? "border-primary bg-primary/10"
-              : "border-gray-300 hover:border-primary"
-          }
-          sm:p-12 md:p-16`}
-          >
-            <input
-              {...getInputProps({
-                id: "picture",
-                onChange: handleFileChange,
-                ref: fileInputRef,
-              })}
-            />
-            <Upload className="mx-auto h-12 w-12 text-gray-400" />
-            {isDragActive ? (
-              <p className="mt-4 text-lg">Drop the file here ...</p>
-            ) : (
-              <p className="mt-4 text-lg">
-                Drag & drop a file here, or click to select a file
-              </p>
-            )}
-            {file && (
-              <p className="mt-4 text-sm text-gray-500">
-                Selected file: {file.name}
-              </p>
-            )}
-          </div>
-        </>
-      )}
-      {fileUploaded && <DynamicTable data={data} />}
-    </div>
+    <Container
+      style={{
+        height: "100vh",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <GradientTypography variant="h4" gutterBottom align="center">
+        Upload Your CSV File
+      </GradientTypography>
+      <Typography
+        variant="subtitle1"
+        gutterBottom
+        align="center"
+        color="text.secondary"
+      >
+        Drag & drop your file or click to browse
+      </Typography>
+      <UploadPaper
+        elevation={3}
+        {...getRootProps()}
+        sx={{
+          backgroundColor: isDragActive
+            ? theme.palette.primary.light
+            : "transparent",
+        }}
+      >
+        <input {...getInputProps()} />
+        <UploadIcon size={48} color={theme.palette.primary.main} />
+        <Typography variant="h6" sx={{ mt: 2 }}>
+          {isDragActive
+            ? "Drop the file here..."
+            : "Drag & drop a CSV file here, or click to select"}
+        </Typography>
+      </UploadPaper>
+      <Box sx={{ mt: 4, textAlign: "center" }}>
+        <Button
+          variant="contained"
+          {...getRootProps()}
+          sx={{
+            background: "linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)",
+            color: "white",
+            px: 4,
+            py: 1,
+          }}
+        >
+          Select File
+        </Button>
+      </Box>
+    </Container>
   );
 }
